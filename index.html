@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .calculator {
+      width: 320px;
+      background: #1c1f26;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .display {
+      background: #000;
+      color: #fff;
+      font-size: 48px;
+      text-align: right;
+      padding: 24px 16px;
+      height: 96px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      overflow: hidden;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      white-space: nowrap;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      font-size: 22px;
+      padding: 18px 0;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #2c3038;
+      color: #fff;
+      transition: background 0.1s;
+    }
+
+    button:hover {
+      background: #3a3f4a;
+    }
+
+    button:active {
+      background: #4a4f5c;
+      transform: scale(0.96);
+    }
+
+    .operator {
+      background: #f5a623;
+    }
+
+    .operator:hover {
+      background: #f7b145;
+    }
+
+    .operator:active {
+      background: #f8c060;
+    }
+
+    .utility {
+      color: #f5a623;
+    }
+
+    .equals {
+      grid-column: span 2;
+      background: #f5a623;
+    }
+
+    .equals:hover {
+      background: #f7b145;
+    }
+
+    .equals:active {
+      background: #f8c060;
+    }
+  </style>
+</head>
+<body>
+  <div class="calculator">
+    <div class="display" id="display">0</div>
+    <div class="buttons">
+      <button class="utility" data-action="clear">C</button>
+      <button class="utility" data-action="backspace">⌫</button>
+      <button class="utility" data-action="percent">%</button>
+      <button class="operator" data-operator="÷">÷</button>
+      <button data-number="7">7</button>
+      <button data-number="8">8</button>
+      <button data-number="9">9</button>
+      <button class="operator" data-operator="×">×</button>
+      <button data-number="4">4</button>
+      <button data-number="5">5</button>
+      <button data-number="6">6</button>
+      <button class="operator" data-operator="−">−</button>
+      <button data-number="1">1</button>
+      <button data-number="2">2</button>
+      <button data-number="3">3</button>
+      <button class="operator" data-operator="+">+</button>
+      <button data-number="0">0</button>
+      <button data-number=".">.</button>
+      <button class="equals" data-action="equals">=</button>
+    </div>
+  </div>
+
+  <script>
+    const display = document.getElementById("display");
+
+    let expression = "";
+    let result = null;
+    let justEvaluated = false;
+
+    function updateDisplay(value) {
+      display.textContent = value === "" ? "0" : value;
+    }
+
+    function clearAll() {
+      expression = "";
+      result = null;
+      justEvaluated = false;
+      updateDisplay("0");
+    }
+
+    function inputDigit(digit) {
+      if (justEvaluated) {
+        expression = "";
+        result = null;
+        justEvaluated = false;
+      }
+      expression += digit;
+      updateDisplay(expression);
+    }
+
+    function inputDecimal() {
+      if (justEvaluated) {
+        expression = "0.";
+        result = null;
+        justEvaluated = false;
+        updateDisplay(expression);
+        return;
+      }
+      const parts = expression.split(/[+\−×÷]/);
+      const current = parts[parts.length - 1];
+      if (current.includes(".")) {
+        return;
+      }
+      if (current === "") {
+        expression += "0.";
+      } else {
+        expression += ".";
+      }
+      updateDisplay(expression);
+    }
+
+    function inputOperator(op) {
+      if (justEvaluated) {
+        expression = String(result);
+        result = null;
+        justEvaluated = false;
+      }
+      if (expression === "") {
+        expression = "0" + op;
+        updateDisplay(expression);
+        return;
+      }
+      if (/[+\−×÷]$/.test(expression)) {
+        expression = expression.slice(0, -1) + op;
+      } else {
+        expression += op;
+      }
+      updateDisplay(expression);
+    }
+
+    function inputPercent() {
+      if (expression === "") {
+        return;
+      }
+      expression = String(Number(evaluate(expression)) / 100);
+      updateDisplay(expression);
+    }
+
+    function tokenize(expr) {
+      const tokens = [];
+      let num = "";
+      for (const ch of expr) {
+        if (/[0-9.]/.test(ch)) {
+          num += ch;
+        } else {
+          if (num !== "") {
+            tokens.push(Number(num));
+            num = "";
+          }
+          tokens.push(ch);
+        }
+      }
+      if (num !== "") {
+        tokens.push(Number(num));
+      }
+      return tokens;
+    }
+
+    function evaluate(expr) {
+      const tokens = tokenize(expr);
+      if (tokens.length === 0) {
+        return 0;
+      }
+
+      const values = [];
+      const ops = [];
+      const precedence = { "+": 1, "−": 1, "×": 2, "÷": 2 };
+
+      function applyOp() {
+        const op = ops.pop();
+        const b = values.pop();
+        const a = values.pop();
+        let result;
+        switch (op) {
+          case "+":
+            result = a + b;
+            break;
+          case "−":
+            result = a - b;
+            break;
+          case "×":
+            result = a * b;
+            break;
+          case "÷":
+            if (b === 0) {
+              throw new Error("Division by zero");
+            }
+            result = a / b;
+            break;
+        }
+        values.push(result);
+      }
+
+      for (const token of tokens) {
+        if (typeof token === "number") {
+          values.push(token);
+        } else {
+          while (
+            ops.length > 0 &&
+            precedence[ops[ops.length - 1]] >= precedence[token]
+          ) {
+            applyOp();
+          }
+          ops.push(token);
+        }
+      }
+
+      while (ops.length > 0) {
+        applyOp();
+      }
+
+      return values[0];
+    }
+
+    function formatResult(value) {
+      if (value === Infinity || value === -Infinity) {
+        return "‎Error";
+      }
+      if (value === 0) {
+        return "0";
+      }
+      if (Math.abs(value) < 1e-15) {
+        return "0";
+      }
+      const rounded = Math.round(value * 1e10) / 1e10;
+      return String(rounded);
+    }
+
+    function calculateEquals() {
+      if (expression === "") {
+        return;
+      }
+      let computed;
+      try {
+        computed = evaluate(expression);
+      } catch (e) {
+        display.textContent = "Error";
+        expression = "";
+        result = null;
+        return;
+      }
+      result = computed;
+      justEvaluated = true;
+      updateDisplay(formatResult(result));
+    }
+
+    function handleBackspace() {
+      if (justEvaluated) {
+        clearAll();
+        return;
+      }
+      expression = expression.slice(0, -1);
+      updateDisplay(expression);
+    }
+
+    document.querySelectorAll("button").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.number !== undefined) {
+          inputDigit(button.dataset.number);
+        } else if (button.dataset.operator) {
+          inputOperator(button.dataset.operator);
+        } else {
+          const action = button.dataset.action;
+          if (action === "clear") {
+            clearAll();
+          } else if (action === "backspace") {
+            handleBackspace();
+          } else if (action === "percent") {
+            inputPercent();
+          } else if (action === "equals") {
+            calculateEquals();
+          }
+        }
+      });
+    });
+
+    document.addEventListener("keydown", (event) => {
+      const key = event.key;
+      if (/^[0-9]$/.test(key)) {
+        inputDigit(key);
+      } else if (key === ".") {
+        inputDecimal();
+      } else if (key === "+") {
+        inputOperator("+");
+      } else if (key === "-") {
+        inputOperator("−");
+      } else if (key === "*") {
+        inputOperator("×");
+      } else if (key === "/") {
+        event.preventDefault();
+        inputOperator("÷");
+      } else if (key === "Enter" || key === "=") {
+        event.preventDefault();
+        calculateEquals();
+      } else if (key === "Backspace") {
+        handleBackspace();
+      } else if (key === "Escape" || key === "Delete") {
+        clearAll();
+      } else if (key === "%") {
+        inputPercent();
+      }
+    });
+  </script>
+</body>
+</html>
